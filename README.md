@@ -4,7 +4,7 @@ C++11 headers only cursors for SQLite / MySQL(MariaDB) / PostreSQL
 
 Motivation:
 -----------
-  * extramly low-memory-footprint (it depends on result set)
+  * extremely low-memory-footprint (it depends on result set)
   * blazing fast speed (it depends on intra/inter net connection speed)
   * interact with stl algorithms
   * interact with range-based 'for' loops
@@ -23,7 +23,7 @@ You should:
   * use 'blob' helper for binding blobs
   * use 'value' helper for named bindings (where available), it's std::pair
   * use '{\d}' to build dynamic query only for column names
-  * use 'format' helper for '{\d}', it's std::initializer_list<std::string>
+  * use 'format' helper for '{\d}', it's std::initializer_list< std::string >
   * use std::string for queries only with query contructor
   * use operator<< C-string for queries
   * use operator<< std::string for binding
@@ -32,12 +32,13 @@ You should:
 
 You should NOT:
 ---------------
-  * use operator<< std::string for queries (it will be binding)
+  * use operator<< std::string for queries (it will be bind)
   * use '{\d}' to build dynamic queries except for column names, \ and ' are not escaped
   * share cursor or iterator between threads
+  * cache iterators, cursor menage a shared statement, iterator has a weak reference to it
   * allow your cursor/iterator to outlive your database connection i.e.
     auto cursor = sqlitexx::connection::create()->query()->execute();
-  * use 'using namespace' different backends shares same names
+  * use 'using namespace', different backends shares same names
 
 Test compilation on Linux:
 --------------------------
