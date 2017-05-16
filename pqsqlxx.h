@@ -277,7 +277,7 @@ private:
     }
     if (sqlxx::query_has_results(query.c_str())) {
 #ifdef USE_SHARED_CONNECTION
-      std::atomic<size_t> i(0);
+      static std::atomic<size_t> i(0);
 #else
       static size_t i = 0;
 #endif
