@@ -308,9 +308,9 @@ public:
   query(db const& db, std::string const& str) : sqlxx::query(str), db_(db) {}
 
 private:
-  void do_bind(::MYSQL_STMT* stmt, std::vector<sqlxx::field_type> binds) {
+  int do_bind(::MYSQL_STMT* stmt, std::vector<sqlxx::field_type> binds) {
     auto cnt = ::mysql_stmt_param_count(stmt);
-    if (!cnt) return;
+    if (!cnt) return ::mysql_stmt_execute(stmt);
     std::vector<MYSQL_BIND> mbinds(cnt);
     for (size_t i = 0; i < cnt; ++i) {
       if (i >= binds.size()) continue;
@@ -356,6 +356,7 @@ private:
       }
     }
     ::mysql_stmt_bind_param(stmt, mbinds.data());
+    return ::mysql_stmt_execute(stmt);
   }
 
   sqlxx::cursor execute_impl(char const* query, std::vector<sqlxx::field_type> bind) override {
@@ -370,8 +371,7 @@ private:
         ::mysql_stmt_attr_set(stmt, STMT_ATTR_PREFETCH_ROWS, &rows);
       }
       if (::mysql_stmt_prepare(stmt, query, strlen(query)) == 0) {
-        do_bind(stmt, std::move(bind));
-        ::mysql_stmt_execute(stmt) == 0 && tr.commit();
+        do_bind(stmt, std::move(bind)) == 0 && tr.commit();
       }
       return stmt;
     };
