@@ -129,35 +129,35 @@ public:
   ~statement() override { if (stmt_) ::sqlite3_finalize(stmt_); }
 
   sqlxx::row next() override {
-    sqlxx::row row_;
+    sqlxx::row row;
     if (!stmt_ || ::sqlite3_step(stmt_) != SQLITE_ROW) return {};
     for (int i = 0; i < ::sqlite3_column_count(stmt_); ++i) {
       switch (::sqlite3_column_type(stmt_, i))
       {
       case SQLITE_INTEGER:
-        row_.emplace_back(std::int64_t(::sqlite3_column_int64(stmt_, i)), ::sqlite3_column_name(stmt_, i));
+        row.emplace_back(std::int64_t(::sqlite3_column_int64(stmt_, i)), ::sqlite3_column_name(stmt_, i));
         break;
       case SQLITE_FLOAT:
-        row_.emplace_back(::sqlite3_column_double(stmt_, i), ::sqlite3_column_name(stmt_, i));
+        row.emplace_back(::sqlite3_column_double(stmt_, i), ::sqlite3_column_name(stmt_, i));
         break;
       case SQLITE_BLOB: {
         auto const* data = reinterpret_cast<std::uint8_t const*>(::sqlite3_column_blob(stmt_, i));
         blob b(data, ::sqlite3_column_bytes(stmt_, i));
-        row_.emplace_back(std::move(b), ::sqlite3_column_name(stmt_, i));
+        row.emplace_back(std::move(b), ::sqlite3_column_name(stmt_, i));
       } break;
       case SQLITE_TEXT: {
         std::string text(reinterpret_cast<char const*>(::sqlite3_column_text(stmt_, i)));
-        row_.emplace_back(std::move(text), ::sqlite3_column_name(stmt_, i));
+        row.emplace_back(std::move(text), ::sqlite3_column_name(stmt_, i));
       } break;
       case SQLITE_NULL:
-        row_.emplace_back(::sqlite3_column_name(stmt_, i));
+        row.emplace_back(::sqlite3_column_name(stmt_, i));
         break;
       default:
-        row_.emplace_back(std::int64_t(0), ::sqlite3_column_name(stmt_, i));
+        row.emplace_back(std::int64_t(0), ::sqlite3_column_name(stmt_, i));
         break;
       }
     }
-    return std::move(row_);
+    return row;
   }
   void first() override { if (stmt_) ::sqlite3_reset(stmt_); }
   result_type result() const override { return result_; };
@@ -218,7 +218,7 @@ class query : public sqlxx::query {
 public:
   query(db&& db) = delete;
   query(db const& db) : db_(db) {}
-  query(db const& db, const std::string &str) : sqlxx::query(str), db_(db) {}
+  query(db const& db, std::string const& str) : sqlxx::query(str), db_(db) {}
 
 private:
   int do_bind(::sqlite3_stmt* stmt, std::vector<sqlxx::field_type> binds) {

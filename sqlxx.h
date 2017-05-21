@@ -51,12 +51,12 @@
 typedef std::initializer_list<std::string> format;
 
 template<class...Args> static
-std::tuple<Args...> values(Args... p) {
-  return std::make_tuple(std::forward<Args>(p)...);
+auto values(Args&&... p) -> decltype(std::forward_as_tuple(std::forward<Args>(p)...)) {
+  return std::forward_as_tuple(std::forward<Args>(p)...);
 }
 
 template<class T, class N> static
-std::pair<T, N> value(T t, N n) {
+auto value(T&& t, N&& n) -> decltype(std::make_pair(std::forward<T>(t), std::forward<N>(n))) {
   return std::make_pair(std::forward<T>(t), std::forward<N>(n));
 }
 
@@ -103,11 +103,11 @@ public:
   inline bool empty() const { return data_.empty(); }
   inline void clear() { data_.clear(); }
 
-  operator std::string&&() { return std::move(data_); }
+  operator std::string&&() && { return std::move(data_); }
   operator std::string const&() const { return data_; }
 
-  bool operator==(const blob& o) const { return data_ == o.data_; }
-  bool operator!=(const blob& o) const { return data_ != o.data_; }
+  bool operator==(blob const& o) const { return data_ == o.data_; }
+  bool operator!=(blob const& o) const { return data_ != o.data_; }
 
   reference operator[](size_t pos) { return reinterpret_cast<reference>(data_[pos]); }
   const_reference operator[](size_t pos) const { return reinterpret_cast<const_reference>(data_[pos]); }
@@ -164,18 +164,18 @@ struct field_type {
   field_type() {}
   field_type(field_type const& other) { operator=(other); }
   field_type(field_type&& other) { operator=(std::move(other)); }
-  field_type(const std::string& name) : name_(name), type_(SQL_NULL) {}
-  field_type(std::int64_t i, const std::string& name)
+  field_type(std::string const& name) : name_(name), type_(SQL_NULL) {}
+  field_type(std::int64_t i, std::string const& name)
     : name_(name), type_(SQL_INTEGER) { int_ = i;  float_ = double(int_); }
-  field_type(double d, const std::string& name)
+  field_type(double d, std::string const& name)
     : name_(name), type_(SQL_FLOAT)  { float_ = d; int_ = std::int64_t(d); }
-  field_type(std::string&& s, const std::string& name)
+  field_type(std::string&& s, std::string const& name)
     : name_(name), type_(SQL_TEXT) { str_ = std::move(s); }
-  field_type(const std::string& s, const std::string& name)
+  field_type(std::string const& s, std::string const& name)
     : name_(name), type_(SQL_TEXT) { str_ = s; }
-  explicit field_type(blob&& b, const std::string& name)
+  explicit field_type(blob&& b, std::string const& name)
     : name_(name), type_(SQL_BLOB) { str_ = std::move(b); }
-  explicit field_type(const blob& b, const std::string& name)
+  explicit field_type(blob const& b, std::string const& name)
     : name_(name), type_(SQL_BLOB) { str_ = b; }
 
   field_type& operator=(field_type const& other) {
@@ -238,7 +238,7 @@ struct field_type {
   // returns true if field is NULL
   inline bool is_null() const { return type_ == SQL_NULL; }
 
-  bool operator==(field_type const &f) const {
+  bool operator==(field_type const& f) const {
     return type_ == f.type_ && int_ == f.int_
         && str_ == f.str_ && name_ == f.name_
         && std::fabs(float_ - f.float_) < std::numeric_limits<double>::epsilon();
@@ -394,55 +394,61 @@ public:
   virtual ~query() {}
 
   template <class T>
-  query& operator<< (T const&) {
-    static_assert(std::is_same<T, void>::value, "not imlemented");
-    return *this;
+  query& operator<< (T&& t) {
+    return bind({}, std::forward<T>(t));
   }
 
   template<class T, size_t N, size_t M>
   struct expand {
-    static void tuple(query& q, T const& t) {
-      q.bind(std::get<N>(t));
-      expand<T, N+1, M>::tuple(q, t);
+    static void tuple(query& q, T&& t) {
+      q.bind(std::get<N>(std::forward<T>(t)));
+      expand<T, N+1, M>::tuple(q, std::forward<T>(t));
     }
   };
 
   template<class T, size_t N>
   struct expand<T, N, N> {
-    static void tuple(query&, T const&) {}
+    static void tuple(query&, T&&) {}
   };
 
   template<class... Args>
-  query& operator<<(std::tuple<Args...> const& t) {
-    expand<decltype(t), 0, sizeof...(Args)>::tuple(*this, t);
+  query& operator<<(std::tuple<Args...> t) {
+    expand<decltype(t), 0, sizeof...(Args)>::tuple(*this, std::forward<std::tuple<Args...>>(t));
     return *this;
   }
 
-  template<class T, class N>
+  template<class T1, class T2>
   struct binder {
-    static void pair(query&, std::pair<T, N> const&) {
-      static_assert(std::is_same<T, char const*>::value
-                 || std::is_same<T, std::string>::value, "name should be a string");
+    static void pair(query&, std::pair<T1, T2>&&) {
+      static_assert(std::is_same<T1, char const*>::value
+                 || std::is_same<T1, std::string>::value, "name should be a string");
     }
   };
 
-  template<class T>
-  struct binder<char const*, T> {
-    static void pair(query& q, std::pair<char const*, T> const& p) {
-      q.bind(p.first, p.second);
+  template<size_t N, class T2>
+  struct binder<char const (&)[N], T2> {
+    static void pair(query& q, std::pair<char const (&)[N], T2>&& p) {
+      q.bind(p.first, std::forward<T2>(p.second));
     }
   };
 
-  template<class T>
-  struct binder<std::string, T> {
-    static void pair(query& q, std::pair<std::string, T> const& p) {
-      q.bind(p.first, p.second);
+  template<class T2>
+  struct binder<char const*, T2> {
+    static void pair(query& q, std::pair<char const*, T2>&& p) {
+      q.bind(p.first, std::forward<T2>(p.second));
     }
   };
 
-  template<class T, class N>
-  query& operator<<(std::pair<T, N> const& p) {
-    binder<T, N>::pair(*this, p);
+  template<class T2>
+  struct binder<std::string, T2> {
+    static void pair(query& q, std::pair<std::string, T2>&& p) {
+      q.bind(p.first, std::forward<T2>(p.second));
+    }
+  };
+
+  template<class T1, class T2>
+  query& operator<<(std::pair<T1, T2> p) {
+    binder<T1, T2>::pair(*this, std::forward<std::pair<T1, T2>>(p));
     return *this;
   }
 
@@ -460,46 +466,6 @@ public:
     }
     query_ << std::move(q);
     return *this;
-  }
-
-  query& operator<< (float f) {
-    return bind(double(f));
-  }
-
-  query& operator<< (double d) {
-    return bind(d);
-  }
-
-  query& operator<< (int i) {
-    return bind(std::int64_t(i));
-  }
-
-  query& operator<< (short s) {
-    return bind(std::int64_t(s));
-  }
-
-  query& operator<< (size_t s) {
-    return bind(std::int64_t(s));
-  }
-
-  query& operator<< (std::int64_t i64) {
-    return bind(i64);
-  }
-
-  query& operator<< (blob const& b) {
-    return bind(b);
-  }
-
-  query& operator<< (std::string const& text) {
-    return bind(text);
-  }
-
-  query& operator<< (std::string&& text) {
-    return bind(std::move(text));
-  }
-
-  query& operator<< (blob&& b) {
-    return bind(std::move(b));
   }
 
   query& operator<< (char const* text)
@@ -522,65 +488,43 @@ public:
   cursor execute() {
     auto cursor = execute_impl(query_.str().c_str(), std::move(bind_));
     query_.str({});
-    return std::move(cursor);
+    return cursor;
   }
 
   // bind to query
-  query& bind(int i) {
-    return bind({}, std::int64_t(i));
+  template<class T>
+  query& bind(T&& t) {
+    return bind({}, std::forward<T>(t));
   }
 
-  query& bind(std::int64_t i64) {
-    return bind({}, i64);
-  }
-
-  query& bind(double d) {
-    return bind({}, d);
-  }
-
-  query& bind(const std::string& text) {
-    return bind({}, text);
-  }
-
-  query& bind(const blob& b) {
-    return bind({}, b);
-  }
-
-  query& bind(blob&& b) {
-    return bind({}, std::move(b));
-  }
-
-  query& bind(std::string&& text) {
-    return bind({}, std::move(text));
-  }
-
-  query& bind(std::string const& param, std::int64_t i64) {
-    bind_.emplace_back(i64, param);
+  query& bind(std::string const& param, float f) {
+    bind_.emplace_back(double(f), param);
     return *this;
   }
 
-  query& bind(std::string const& param, double d) {
-    bind_.emplace_back(d, param);
+  query& bind(std::string const& param, char c) {
+    bind_.emplace_back(std::int64_t(c), param);
     return *this;
   }
 
-  query& bind(std::string const& param, std::string const& text) {
-    bind_.emplace_back(text, param);
+  query& bind(std::string const& param, short s) {
+    bind_.emplace_back(std::int64_t(s), param);
     return *this;
   }
 
-  query& bind(std::string const& param, blob const& b) {
-    bind_.emplace_back(b, param);
+  query& bind(std::string const& param, int i) {
+    bind_.emplace_back(std::int64_t(i), param);
     return *this;
   }
 
-  query& bind(std::string const& param, std::string&& text) {
-    bind_.emplace_back(std::move(text), param);
+  query& bind(std::string const& param, size_t s) {
+    bind_.emplace_back(std::int64_t(s), param);
     return *this;
   }
 
-  query& bind(std::string const& param, blob&& b) {
-    bind_.emplace_back(std::move(b), param);
+  template<class T>
+  query& bind(std::string const& param, T&& t) {
+    bind_.emplace_back(std::forward<T>(t), param);
     return *this;
   }
 

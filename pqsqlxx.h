@@ -190,7 +190,7 @@ public:
       std::int64_t i64 = std::strtoll(data, nullptr, 10);
       row.emplace_back(i64, name);
     }
-    return std::move(row);
+    return row;
   }
 
   void first() override {
@@ -351,7 +351,7 @@ public:
   static std::unique_ptr<sqlxx::connection> create(char const* conninfo) {
     std::unique_ptr<connection> con{ new connection(conninfo) };
     if (!con->db_.is_open()) con.reset();
-    return std::move(con);
+    return con;
   }
 
   void vacuum() override { db_.vacuum(); }

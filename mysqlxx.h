@@ -155,7 +155,7 @@ public:
 
   sqlxx::row next() override {
     if (!res_ || !num_) return {};
-    sqlxx::row row_;
+    sqlxx::row row;
     std::vector<MYSQL_BIND> mbinds(num_);
     for(auto &bind : mbinds) {
       bind.length = &bind.buffer_length;
@@ -176,14 +176,14 @@ public:
         bind.buffer_type = field->type;
         bind.buffer = reinterpret_cast<void *>(&i8);
         ::mysql_stmt_fetch_column(stmt_, &bind, i, 0);
-        row_.emplace_back(std::int64_t(i8), field->org_name);
+        row.emplace_back(std::int64_t(i8), field->org_name);
       } break;
       case MYSQL_TYPE_SHORT: {
         short i16 = 0;
         bind.buffer_type = field->type;
         bind.buffer = reinterpret_cast<void *>(&i16);
         ::mysql_stmt_fetch_column(stmt_, &bind, i, 0);
-        row_.emplace_back(std::int64_t(i16), field->org_name);
+        row.emplace_back(std::int64_t(i16), field->org_name);
       } break;
       case MYSQL_TYPE_INT24:
       case MYSQL_TYPE_LONG: {
@@ -191,50 +191,50 @@ public:
         bind.buffer_type = field->type;
         bind.buffer = reinterpret_cast<void *>(&i32);
         ::mysql_stmt_fetch_column(stmt_, &bind, i, 0);
-        row_.emplace_back(std::int64_t(i32), field->org_name);
+        row.emplace_back(std::int64_t(i32), field->org_name);
       } break;
       case MYSQL_TYPE_LONGLONG: {
         std::int64_t i64 = 0;
         bind.buffer_type = field->type;
         bind.buffer = reinterpret_cast<void *>(&i64);
         ::mysql_stmt_fetch_column(stmt_, &bind, i, 0);
-        row_.emplace_back(i64, field->org_name);
+        row.emplace_back(i64, field->org_name);
       } break;
       case MYSQL_TYPE_FLOAT: {
         float f;
         bind.buffer_type = field->type;
         bind.buffer = reinterpret_cast<void *>(&f);
         ::mysql_stmt_fetch_column(stmt_, &bind, i, 0);
-        row_.emplace_back(double(f), field->org_name);
+        row.emplace_back(double(f), field->org_name);
       } break;
       case MYSQL_TYPE_DOUBLE: {
         double d;
         bind.buffer_type = field->type;
         bind.buffer = reinterpret_cast<void *>(&d);
         ::mysql_stmt_fetch_column(stmt_, &bind, i, 0);
-        row_.emplace_back(d, field->org_name);
+        row.emplace_back(d, field->org_name);
       } break;
       case MYSQL_TYPE_STRING: case MYSQL_TYPE_VAR_STRING:
       case MYSQL_TYPE_BLOB: if (field->charsetnr == 63) {
         blob v(bind.buffer_length);
         bind.buffer = const_cast<std::uint8_t *>(v.data());
         ::mysql_stmt_fetch_column(stmt_, &bind, i, 0);
-        row_.emplace_back(std::move(v), field->org_name);
+        row.emplace_back(std::move(v), field->org_name);
       } else {
         std::string s(bind.buffer_length, '\0');
         bind.buffer = const_cast<char *>(s.data());
         ::mysql_stmt_fetch_column(stmt_, &bind, i, 0);
-        row_.emplace_back(std::move(s), field->org_name);
+        row.emplace_back(std::move(s), field->org_name);
       } break;
       case MYSQL_TYPE_NULL:
-        row_.emplace_back(field->org_name);
+        row.emplace_back(field->org_name);
         break;
       default:
-        row_.emplace_back(std::int64_t(0), field->org_name);
+        row.emplace_back(std::int64_t(0), field->org_name);
         break;
       }
     }
-    return std::move(row_);
+    return row;
   }
 
   void first() override {
@@ -389,7 +389,7 @@ public:
                                                           char const* name) {
     std::unique_ptr<connection> con{ new connection(host, user, pass, name) };
     if (!con->db_.is_open()) con.reset();
-    return std::move(con);
+    return con;
   }
 
   void vacuum() override { db_.vacuum(); }
