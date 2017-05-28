@@ -50,12 +50,12 @@
 
 typedef std::initializer_list<std::string> format;
 
-template<class...Args> static
+template<class...Args> inline
 auto values(Args&&... p) -> decltype(std::forward_as_tuple(std::forward<Args>(p)...)) {
   return std::forward_as_tuple(std::forward<Args>(p)...);
 }
 
-template<class T, class N> static
+template<class T, class N> inline
 auto value(T&& t, N&& n) -> decltype(std::make_pair(std::forward<T>(t), std::forward<N>(n))) {
   return std::make_pair(std::forward<T>(t), std::forward<N>(n));
 }
@@ -139,9 +139,10 @@ private:
 /*
  * Test query produce results
  */
+static
 bool query_has_results(char const* query) {
   using namespace std::regex_constants;
-  std::regex expect_results[] = {
+  std::regex const expect_results[] = {
     std::regex("\\b(DESC)\\b", ECMAScript | icase),
     std::regex("\\b(SHOW)\\b", ECMAScript | icase),
     std::regex("\\b(EXPLAIN)\\b", ECMAScript | icase),
